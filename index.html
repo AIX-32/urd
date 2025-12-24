@@ -1467,17 +1467,21 @@
                                 if (entry.isIntersecting) {
                                     // Only auto-play if not in an overlay
                                     if (!video.parentElement || !video.parentElement.classList.contains('video-overlay')) {
-                                        video.play().catch(e => console.log('Autoplay prevented:', e));
+                                        // Add a small delay to ensure the video element is fully loaded
+                                        setTimeout(() => {
+                                            video.play().catch(e => console.log('Autoplay prevented:', e));
+                                        }, 100);
                                     }
                                 } else {
                                     // Only pause if not in an overlay
                                     if (!video.parentElement || !video.parentElement.classList.contains('video-overlay')) {
                                         video.pause();
-                                        video.currentTime = 0;
+                                        // Don't reset currentTime to 0, keep current position
+                                        // video.currentTime = 0;
                                     }
                                 }
                             });
-                        }, { threshold: 0.25 }); // Lower threshold for better response
+                        }, { threshold: 0.5 }); // Require 50% visibility for more reliable playback
                         this.videoObservers.set(video, observer);
                         observer.observe(video);
                     }
@@ -1590,17 +1594,21 @@
                                     if (vEntry.isIntersecting) {
                                         // Only auto-play if not in an overlay
                                         if (!vEntry.target.parentElement || !vEntry.target.parentElement.classList.contains('video-overlay')) {
-                                            vEntry.target.play().catch(e => console.log('Autoplay prevented:', e));
+                                            // Add a small delay to ensure the video element is fully loaded
+                                            setTimeout(() => {
+                                                vEntry.target.play().catch(e => console.log('Autoplay prevented:', e));
+                                            }, 100);
                                         }
                                     } else {
                                         // Only pause if not in an overlay
                                         if (!vEntry.target.parentElement || !vEntry.target.parentElement.classList.contains('video-overlay')) {
                                             vEntry.target.pause();
-                                            vEntry.target.currentTime = 0;
+                                            // Don't reset currentTime to 0, keep current position
+                                            // vEntry.target.currentTime = 0;
                                         }
                                     }
                                 });
-                            }, { threshold: 0.25 });
+                            }, { threshold: 0.5 }); // Require 50% visibility for more reliable playback
                             this.videoObservers.set(entry.target, autoObserver);
                             autoObserver.observe(entry.target);
                         }
@@ -1945,7 +1953,7 @@
                 if (video.parentElement && video.parentElement.classList.contains('video-overlay')) {
                     // If it's already playing in overlay, toggle play/pause
                     if (video.paused) {
-                        video.play();
+                        video.play().catch(e => console.log('Play prevented:', e));
                     } else {
                         video.pause();
                     }
@@ -2243,6 +2251,15 @@
                     overlay.removeChild(video);
                     // Put the video back in its original parent
                     originalParent.appendChild(video);
+                    
+                    // Resume the intersection observer after exiting overlay
+                    // First check if it's already being observed to avoid duplicates
+                    const observer = this.videoObservers.get(video);
+                    if (observer) {
+                        // Check if already observing (to prevent multiple observers)
+                        // The IntersectionObserver API handles this internally, so just observe
+                        observer.observe(video);
+                    }
                 }
             }
             
