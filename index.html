@@ -3,20 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="/urd/">
     <title>URD* - Media Library</title>
-    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="icon" type="image/png" href="/urd/favicon.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#000000">
     <meta name="description" content="URD* Media Library - Your personal media gallery">
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="/urd/manifest.json">
     
     <!-- iOS Safari support -->
     <meta name="apple-mobile-web-app-title" content="URD* Media Library">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <link rel="apple-touch-icon" href="favicon.png">
+    <link rel="apple-touch-icon" href="/urd/favicon.png">
     <style>
         * {
             margin: 0;
@@ -815,7 +816,6 @@
             .stat-value { font-size: 1.8rem; }
         }
 
-        /* Mobile Action Buttons */
         .mobile-action-buttons {
             display: flex;
             gap: 8px;
@@ -827,7 +827,6 @@
             .mobile-action-buttons { display: flex; }
         }
 
-        /* Progress Bar */
         .progress-bar {
             width: 200px;
             height: 4px;
@@ -2101,7 +2100,7 @@
         // Register service worker for PWA functionality
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
+                navigator.serviceWorker.register('./sw.js', { scope: '/urd/' })
                     .then((registration) => {
                         console.log('ServiceWorker registration successful with scope: ', registration.scope);
                     })

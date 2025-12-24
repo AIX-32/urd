@@ -1,8 +1,8 @@
 const CACHE_NAME = 'urd-media-library-v1';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json'
+  '/urd/',
+  '/urd/index.html',
+  '/urd/manifest.json'
 ];
 
 // Install a service worker
