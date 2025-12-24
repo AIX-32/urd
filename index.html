@@ -377,6 +377,11 @@
             column-gap: 20px;
             margin-bottom: 32px;
         }
+        
+        #virtualMediaGrid {
+            position: relative;
+            width: 100%;
+        }
 
         /* Desktop Column Settings */
         @media (min-width: 640px) {
@@ -982,17 +987,85 @@
                 this.autoScrollIntervalTime = 3000; // 3 seconds
                 this.imageUrls = new Set();
                 
+                // Virtual scrolling properties
+                this.virtualContainer = document.createElement('div');
+                this.virtualContainer.id = 'virtualMediaGrid';
+                this.virtualContainer.style.position = 'relative';
+                this.container.appendChild(this.virtualContainer);
+                
+                this.visibleStart = 0;
+                this.visibleEnd = 0;
+                this.itemHeight = 300; // Approximate height for initial calculation
+                this.bufferSize = 10; // Number of items to render above/below viewport
+                
                 this.setupEventListeners();
                 this.updateFileCounter();
                 
                 window.addEventListener('resize', () => {
                     this.isMobile = window.innerWidth <= 768;
+                    this.calculateItemHeight();
+                    this.updateVisibleItems();
                 });
                 
                 this.showEmptyState();
                 this.hideLoading();
             }
-
+            
+            calculateItemHeight() {
+                // Get an approximate height by checking a few existing items
+                const sampleCard = this.container.querySelector('.media-card');
+                if (sampleCard) {
+                    this.itemHeight = sampleCard.offsetHeight || 300;
+                }
+            }
+            
+            updateVisibleItems() {
+                if (this.groupedMedia.length === 0) return;
+                
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                const viewportHeight = window.innerHeight;
+                
+                // Calculate visible range with buffer
+                const startIndex = Math.max(0, Math.floor((scrollTop - this.bufferSize * this.itemHeight) / this.itemHeight));
+                const endIndex = Math.min(
+                    this.groupedMedia.length, 
+                    Math.ceil((scrollTop + viewportHeight + this.bufferSize * this.itemHeight) / this.itemHeight)
+                );
+                
+                // Ensure we have valid indices
+                const newStart = Math.max(0, startIndex);
+                const newEnd = Math.min(this.groupedMedia.length, endIndex);
+                
+                // Only update if the visible range has changed significantly
+                if (newStart !== this.visibleStart || newEnd !== this.visibleEnd) {
+                    this.visibleStart = newStart;
+                    this.visibleEnd = newEnd;
+                    this.renderVisibleItems();
+                }
+            }
+            
+            renderVisibleItems() {
+                // Clear current visible items
+                this.virtualContainer.innerHTML = '';
+                
+                // Add only visible items
+                for (let i = this.visibleStart; i < this.visibleEnd; i++) {
+                    if (i < this.groupedMedia.length) {
+                        const mediaGroup = this.groupedMedia[i];
+                        const card = this.createMediaCard(mediaGroup, i);
+                        
+                        // Position the card in the virtual container
+                        card.style.position = 'absolute';
+                        card.style.top = `${i * this.itemHeight}px`;
+                        card.style.width = '100%';
+                        // Add z-index to ensure proper layering
+                        card.style.zIndex = '1';
+                        
+                        this.virtualContainer.appendChild(card);
+                    }
+                }
+            }
+            
             setupEventListeners() {
                 const fileInput = document.getElementById('fileInput');
                 const folderInput = document.getElementById('folderInput');
@@ -1062,6 +1135,16 @@
                         installPWAHandler();
                     });
                 }
+                
+                // Add scroll event listener for virtual scrolling
+                let scrollTimeout;
+                window.addEventListener('scroll', () => {
+                    // Use throttle to limit how often the update happens
+                    clearTimeout(scrollTimeout);
+                    scrollTimeout = setTimeout(() => {
+                        this.updateVisibleItems();
+                    }, 16); // ~60fps
+                });
             }
 
             showLoading(message = 'Indexing files...') {
@@ -1281,7 +1364,7 @@
                 return result.sort((a, b) => a.originalIndex - b.originalIndex);
             }
 
-            createMediaElement(file) {
+            createMediaElement(file, lazyLoad = true) {
                 // Check file size (e.g., limit to 100MB)
                 const MAX_SIZE = 100 * 1024 * 1024; // 100MB
                 if (file.size > MAX_SIZE) {
@@ -1289,33 +1372,47 @@
                     return null;
                 }
                 
-                const url = URL.createObjectURL(file);
-                
                 if (file.type.startsWith('image/')) {
                     const img = new Image();
                     img.loading = 'lazy';
-                    img.src = url;
-                    img.alt = file.name;
                     
-                    // Store the URL to be used in fullscreen
-                    img.dataset.originalUrl = url;
-                    // Track the URL for cleanup
-                    this.imageUrls.add(url);
-                    
-                    // Handle loading asynchronously
-                    img.onload = () => {
-                        // Don't revoke the URL here since we might need it for fullscreen
-                    };
-                    
-                    img.onerror = () => {
-                        console.error('Failed image:', file.name);
-                        this.imageUrls.delete(url); // Remove from tracking
-                        URL.revokeObjectURL(url);
-                        // Update the UI to show error if needed
-                        if (img.parentNode) {
-                            img.outerHTML = '<span style="color:red; font-size:0.8rem">Failed to load</span>';
-                        }
-                    };
+                    // For lazy loading, we'll set up the loading after the element is in the DOM
+                    if (lazyLoad) {
+                        // Create a placeholder with dimensions
+                        img.style.backgroundColor = '#333';
+                        img.style.display = 'block';
+                        img.style.width = '100%';
+                        img.style.height = 'auto';
+                        img.alt = file.name;
+                        
+                        // Set up lazy loading
+                        this.setupImageLazyLoading(img, file);
+                    } else {
+                        // Direct loading for immediate display
+                        const url = URL.createObjectURL(file);
+                        img.src = url;
+                        img.alt = file.name;
+                        
+                        // Store the URL to be used in fullscreen
+                        img.dataset.originalUrl = url;
+                        // Track the URL for cleanup
+                        this.imageUrls.add(url);
+                        
+                        // Handle loading asynchronously
+                        img.onload = () => {
+                            // Don't revoke the URL here since we might need it for fullscreen
+                        };
+                        
+                        img.onerror = () => {
+                            console.error('Failed image:', file.name);
+                            this.imageUrls.delete(url); // Remove from tracking
+                            URL.revokeObjectURL(url);
+                            // Update the UI to show error if needed
+                            if (img.parentNode) {
+                                img.outerHTML = '<span style="color:red; font-size:0.8rem">Failed to load</span>';
+                            }
+                        };
+                    }
                     
                     // Add click event to go directly to fullscreen
                     img.addEventListener('click', (e) => {
@@ -1330,52 +1427,187 @@
                     video.muted = true; // Crucial for autoplay
                     video.loop = true;
                     video.preload = 'metadata';
-                    video.src = url;
                     
-                    video.onloadedmetadata = () => {
-                        URL.revokeObjectURL(url);
-                    };
-                    
-                    video.onerror = () => {
-                        console.error('Failed video:', file.name);
-                        URL.revokeObjectURL(url);
-                        // Update the UI to show error if needed
-                        if (video.parentNode) {
-                            video.outerHTML = '<span style="color:red; font-size:0.8rem">Failed to load</span>';
-                        }
-                    };
-                    
-                    // Add click event to play video in place
-                    video.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        this.playVideoInPlace(video);
-                    });
-                    
-                    // Attach observer immediately for both mobile and desktop
-                    const observer = new IntersectionObserver((entries) => {
-                        entries.forEach(entry => {
-                            if (entry.isIntersecting) {
-                                // Only auto-play if not in an overlay
-                                if (!video.parentElement || !video.parentElement.classList.contains('video-overlay')) {
-                                    video.play().catch(e => console.log('Autoplay prevented:', e));
-                                }
-                            } else {
-                                // Only pause if not in an overlay
-                                if (!video.parentElement || !video.parentElement.classList.contains('video-overlay')) {
-                                    video.pause();
-                                    video.currentTime = 0;
-                                }
+                    if (lazyLoad) {
+                        // Create a placeholder with play icon overlay
+                        video.style.backgroundColor = '#000';
+                        video.style.display = 'block';
+                        video.style.width = '100%';
+                        video.style.height = 'auto';
+                        
+                        // Set up lazy loading
+                        this.setupVideoLazyLoading(video, file);
+                    } else {
+                        // Direct loading for immediate display
+                        const url = URL.createObjectURL(file);
+                        video.src = url;
+                        
+                        video.onloadedmetadata = () => {
+                            URL.revokeObjectURL(url);
+                        };
+                        
+                        video.onerror = () => {
+                            console.error('Failed video:', file.name);
+                            URL.revokeObjectURL(url);
+                            // Update the UI to show error if needed
+                            if (video.parentNode) {
+                                video.outerHTML = '<span style="color:red; font-size:0.8rem">Failed to load</span>';
                             }
+                        };
+                        
+                        // Add click event to play video in place
+                        video.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            this.playVideoInPlace(video);
                         });
-                    }, { threshold: 0.25 }); // Lower threshold for better response
-                    this.videoObservers.set(video, observer);
-                    observer.observe(video);
+                        
+                        // Attach observer immediately for both mobile and desktop
+                        const observer = new IntersectionObserver((entries) => {
+                            entries.forEach(entry => {
+                                if (entry.isIntersecting) {
+                                    // Only auto-play if not in an overlay
+                                    if (!video.parentElement || !video.parentElement.classList.contains('video-overlay')) {
+                                        video.play().catch(e => console.log('Autoplay prevented:', e));
+                                    }
+                                } else {
+                                    // Only pause if not in an overlay
+                                    if (!video.parentElement || !video.parentElement.classList.contains('video-overlay')) {
+                                        video.pause();
+                                        video.currentTime = 0;
+                                    }
+                                }
+                            });
+                        }, { threshold: 0.25 }); // Lower threshold for better response
+                        this.videoObservers.set(video, observer);
+                        observer.observe(video);
+                    }
                     
                     return { element: video, type: 'video' };
                 }
                 
-                URL.revokeObjectURL(url);
                 return null;
+            }
+            
+            setupImageLazyLoading(img, file) {
+                // Use Intersection Observer to load images when they come into view
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            // Stop observing this element
+                            observer.unobserve(entry.target);
+                            
+                            // Load the actual image
+                            const url = URL.createObjectURL(file);
+                            entry.target.src = url;
+                            entry.target.dataset.originalUrl = url;
+                            
+                            // Track the URL for cleanup
+                            this.imageUrls.add(url);
+                            
+                            entry.target.onload = () => {
+                                // Don't revoke the URL here since we might need it for fullscreen
+                            };
+                            
+                            entry.target.onerror = () => {
+                                console.error('Failed image:', file.name);
+                                this.imageUrls.delete(url); // Remove from tracking
+                                URL.revokeObjectURL(url);
+                                // Update the UI to show error if needed
+                                if (entry.target.parentNode) {
+                                    entry.target.outerHTML = '<span style="color:red; font-size:0.8rem">Failed to load</span>';
+                                }
+                            };
+                        }
+                    });
+                }, { threshold: 0.1 }); // Trigger when 10% of the element is visible
+                
+                observer.observe(img);
+            }
+            
+            setupVideoLazyLoading(video, file) {
+                // Create a placeholder with play icon
+                const placeholder = document.createElement('div');
+                placeholder.style.position = 'relative';
+                placeholder.style.width = '100%';
+                placeholder.style.height = '100%';
+                placeholder.style.backgroundColor = '#000';
+                placeholder.style.display = 'flex';
+                placeholder.style.alignItems = 'center';
+                placeholder.style.justifyContent = 'center';
+                
+                const playIcon = document.createElement('div');
+                playIcon.innerHTML = '▶';
+                playIcon.style.fontSize = '60px';
+                playIcon.style.color = 'rgba(255, 255, 255, 0.8)';
+                playIcon.style.textAlign = 'center';
+                playIcon.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+                playIcon.style.borderRadius = '50%';
+                playIcon.style.width = '80px';
+                playIcon.style.height = '80px';
+                playIcon.style.display = 'flex';
+                playIcon.style.alignItems = 'center';
+                playIcon.style.justifyContent = 'center';
+                
+                placeholder.appendChild(playIcon);
+                video.appendChild(placeholder);
+                
+                // Use Intersection Observer to load videos when they come into view
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            // Stop observing this element
+                            observer.unobserve(entry.target);
+                            
+                            // Remove the placeholder
+                            entry.target.innerHTML = '';
+                            
+                            // Load the actual video
+                            const url = URL.createObjectURL(file);
+                            entry.target.src = url;
+                            
+                            entry.target.onloadedmetadata = () => {
+                                URL.revokeObjectURL(url);
+                            };
+                            
+                            entry.target.onerror = () => {
+                                console.error('Failed video:', file.name);
+                                URL.revokeObjectURL(url);
+                                // Update the UI to show error if needed
+                                if (entry.target.parentNode) {
+                                    entry.target.outerHTML = '<span style="color:red; font-size:0.8rem">Failed to load</span>';
+                                }
+                            };
+                            
+                            // Add click event to play video in place
+                            entry.target.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                this.playVideoInPlace(entry.target);
+                            });
+                            
+                            // Attach observer for auto-play/pause
+                            const autoObserver = new IntersectionObserver((entries) => {
+                                entries.forEach(vEntry => {
+                                    if (vEntry.isIntersecting) {
+                                        // Only auto-play if not in an overlay
+                                        if (!vEntry.target.parentElement || !vEntry.target.parentElement.classList.contains('video-overlay')) {
+                                            vEntry.target.play().catch(e => console.log('Autoplay prevented:', e));
+                                        }
+                                    } else {
+                                        // Only pause if not in an overlay
+                                        if (!vEntry.target.parentElement || !vEntry.target.parentElement.classList.contains('video-overlay')) {
+                                            vEntry.target.pause();
+                                            vEntry.target.currentTime = 0;
+                                        }
+                                    }
+                                });
+                            }, { threshold: 0.25 });
+                            this.videoObservers.set(entry.target, autoObserver);
+                            autoObserver.observe(entry.target);
+                        }
+                    });
+                }, { threshold: 0.1 }); // Trigger when 10% of the element is visible
+                
+                observer.observe(video);
             }
 
             createCarousel(group, cardId) {
@@ -1399,7 +1631,7 @@
                     slide.className = 'carousel-slide';
                     slide.dataset.index = i;
                     
-                    const media = this.createMediaElement(group.files[i]);
+                    const media = this.createMediaElement(group.files[i], true); // Enable lazy loading
                     if (media) {
                         slide.appendChild(media.element);
                     } else {
@@ -1463,9 +1695,9 @@
                     }
                 }
                 
-                // Load slides using synchronous media creation
+                // Load slides using lazy loading
                 group.files.forEach((file, index) => {
-                    const media = this.createMediaElement(file);
+                    const media = this.createMediaElement(file, true); // Enable lazy loading
                     const slide = state.slides[index];
                     if (media && slide) {
                         slide.innerHTML = '';
@@ -1565,7 +1797,7 @@
                     preview.appendChild(carousel);
                 } else {
                     // Single file
-                    const media = this.createMediaElement(mediaGroup.files[0]);
+                    const media = this.createMediaElement(mediaGroup.files[0], true); // Enable lazy loading
                     if (media) {
                         preview.appendChild(media.element);
                     } else {
@@ -1599,21 +1831,20 @@
                     this.updateLoading(0, fileArray.length, 'Organizing files...');
                     this.groupedMedia = await this.groupMediaFiles(this.allMedia);
                     
-                    this.container.innerHTML = '';
-                    const batchSize = 10;
+                    // Set up virtual container with proper height
+                    this.virtualContainer.style.height = `${this.groupedMedia.length * this.itemHeight}px`;
                     
-                    for (let i = 0; i < this.groupedMedia.length; i += batchSize) {
-                        const batch = this.groupedMedia.slice(i, i + batchSize);
-                        const fragment = document.createDocumentFragment();
-                        
-                        batch.forEach((group, batchIndex) => {
-                            fragment.appendChild(this.createMediaCard(group, i + batchIndex));
-                        });
-                        
-                        this.container.appendChild(fragment);
-                        this.updateLoading(Math.min(i + batchSize, this.groupedMedia.length), this.groupedMedia.length, 'Creating cards...');
-                        await new Promise(resolve => setTimeout(resolve, 20)); // Breathe
-                    }
+                    // Initialize visible range
+                    this.visibleStart = 0;
+                    this.visibleEnd = Math.min(this.groupedMedia.length, 20); // Show first 20 items initially
+                    
+                    this.container.innerHTML = '';
+                    this.container.appendChild(this.virtualContainer);
+                    
+                    // Render only visible items
+                    this.renderVisibleItems();
+                    
+                    this.updateLoading(this.groupedMedia.length, this.groupedMedia.length, 'Creating cards...');
                     
                     this.updateStats();
                 } catch (error) {
@@ -1645,6 +1876,7 @@
             }
 
             cleanupObservers() {
+                // Disconnect all video observers
                 this.videoObservers.forEach((observer, video) => {
                     observer.disconnect();
                     video.pause();
@@ -1666,6 +1898,18 @@
                 this.mediaElements.clear();
             }
             
+            cleanupImageURLs() {
+                // Clean up any remaining image URLs
+                this.imageUrls.forEach(url => {
+                    try {
+                        URL.revokeObjectURL(url);
+                    } catch (e) {
+                        // URL might already be revoked, ignore error
+                    }
+                });
+                this.imageUrls.clear();
+            }
+            
             clearAll() {
                 if (this.allMedia.length === 0) return;
                 if (!confirm(`Clear all ${this.allMedia.length} files?`)) return;
@@ -1673,10 +1917,13 @@
                 this.showLoading('Clearing files...');
                 setTimeout(() => {
                     this.cleanupObservers();
+                    this.cleanupImageURLs();
                     this.mediaElements.clear();
                     this.carouselStates.clear();
                     this.allMedia = [];
                     this.groupedMedia = [];
+                    this.visibleStart = 0;
+                    this.visibleEnd = 0;
                     this.container.innerHTML = '';
                     this.updateStats();
                     this.showEmptyState();
@@ -1972,13 +2219,18 @@
             }
             
             renderMediaGrid() {
-                // Clear the container
-                this.container.innerHTML = '';
+                // Set up virtual container with proper height
+                this.virtualContainer.style.height = `${this.groupedMedia.length * this.itemHeight}px`;
                 
-                // Create and append media cards
-                this.groupedMedia.forEach((group, index) => {
-                    this.container.appendChild(this.createMediaCard(group, index));
-                });
+                // Initialize visible range
+                this.visibleStart = 0;
+                this.visibleEnd = Math.min(this.groupedMedia.length, 20); // Show first 20 items initially
+                
+                this.container.innerHTML = '';
+                this.container.appendChild(this.virtualContainer);
+                
+                // Render only visible items
+                this.renderVisibleItems();
                 
                 this.updateStats();
             }
@@ -2040,6 +2292,7 @@
 
         window.addEventListener('beforeunload', () => {
             mediaLibrary.cleanupObservers();
+            mediaLibrary.cleanupImageURLs();
             mediaLibrary.mediaElements.clear();
         });
 
