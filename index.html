@@ -2251,15 +2251,6 @@
                     overlay.removeChild(video);
                     // Put the video back in its original parent
                     originalParent.appendChild(video);
-                    
-                    // Resume the intersection observer after exiting overlay
-                    // First check if it's already being observed to avoid duplicates
-                    const observer = this.videoObservers.get(video);
-                    if (observer) {
-                        // Check if already observing (to prevent multiple observers)
-                        // The IntersectionObserver API handles this internally, so just observe
-                        observer.observe(video);
-                    }
                 }
             }
             
