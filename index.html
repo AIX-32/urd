@@ -1,0 +1,2116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URD* - Media Library</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#000000">
+    <meta name="description" content="URD* Media Library - Your personal media gallery">
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- iOS Safari support -->
+    <meta name="apple-mobile-web-app-title" content="URD* Media Library">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon" href="favicon.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #000000;
+            --bg-secondary: #111111;
+            --bg-card: #1a1a1a;
+            --text-primary: #ffffff;
+            --text-secondary: #aaaaaa;
+            --accent: #FFD700;
+            --accent-dark: #B8860B;
+            --border: #333333;
+            --success: #32CD32;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary); 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent); 
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px; /* Wider for masonry */
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+            visibility: hidden; 
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        .loading-text {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .loading-details {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        /* Scroll to Top Button at Bottom */
+        .bottom-scroll-top {
+            background-color: var(--accent);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 20px auto;
+            width: fit-content;
+        }
+
+        .bottom-scroll-top:hover {
+            background-color: var(--accent-dark);
+            transform: translateY(-2px);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Header */
+        header {
+            background-color: var(--bg-secondary);
+            padding: 12px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .app-title {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            user-select: none;
+        }
+
+        .app-title .star {
+            color: var(--accent);
+            font-size: 1.6rem;
+        }
+
+        /* Hamburger Menu */
+        .hamburger-menu {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.8rem;
+            cursor: pointer;
+            padding: 8px;
+            margin-right: -8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Sidebar */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            right: -300px;
+            width: 280px;
+            height: 100%;
+            background-color: var(--bg-secondary);
+            border-left: 1px solid var(--border);
+            transition: right 0.3s ease;
+            z-index: 1001;
+            overflow-y: auto;
+        }
+
+        .sidebar.active {
+            right: 0;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-close {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .sidebar-menu {
+            padding: 20px 0;
+        }
+
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            color: var(--text-primary);
+            text-decoration: none;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .sidebar-item:hover {
+            background-color: rgba(255, 215, 0, 0.1);
+        }
+
+        .sidebar-item svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Fullscreen styles */
+        body:fullscreen {
+            background-color: var(--bg-primary);
+        }
+
+        body:fullscreen .container {
+            max-width: none;
+        }
+
+        body:fullscreen header {
+            position: static;
+        }
+
+        /* Upload Area */
+        .upload-section {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 2px dashed var(--border);
+            transition: all 0.3s;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .upload-section.dragover {
+            border-color: var(--accent);
+            background-color: rgba(255, 215, 0, 0.05);
+        }
+
+        .upload-button {
+            background-color: var(--accent);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .upload-button:hover {
+            background-color: var(--accent-dark);
+        }
+
+        .upload-button svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .upload-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        #folderInput {
+            display: none;
+        }
+
+        #zipInput {
+            display: none;
+        }
+
+        .upload-info {
+            margin-top: 12px;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background-color: var(--bg-secondary);
+            padding: 16px;
+            border-radius: 10px;
+            border-left: 4px solid var(--accent);
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Media Grid - MASONRY LAYOUT FIX */
+        #mediaContainer {
+            position: relative;
+            min-height: 200px;
+        }
+
+        .media-grid {
+            column-count: 1; /* Mobile default */
+            column-gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        /* Desktop Column Settings */
+        @media (min-width: 640px) {
+            .media-grid { column-count: 2; }
+        }
+        @media (min-width: 1024px) {
+            .media-grid { column-count: 3; }
+        }
+        @media (min-width: 1400px) {
+            .media-grid { column-count: 4; }
+        }
+
+        /* Media Card */
+        .media-card {
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: 1px solid var(--border);
+            width: 100%;
+            margin-bottom: 20px; /* Spacing between masonry items */
+            break-inside: avoid; /* Prevent masonry breaking cards */
+            display: inline-block; /* Essential for column-count */
+            
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeInUp 0.4s ease forwards;
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .media-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(255, 215, 0, 0.1);
+            border-color: var(--accent);
+        }
+
+        .card-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 0.9rem;
+            font-weight: 500;
+            line-height: 1.4;
+            word-break: break-word;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Dynamic Height Preview */
+        .media-preview {
+            position: relative;
+            width: 100%;
+            /* REMOVED FIXED HEIGHT: 250px */
+            min-height: 150px; 
+            max-height: 80vh; /* Prevent excessively tall images */
+            background-color: var(--bg-primary);
+        }
+
+        .media-preview img,
+        .media-preview video {
+            width: 100%;
+            height: auto; /* Dynamic height */
+            display: block;
+            object-fit: contain;
+            background-color: var(--bg-primary);
+        }
+
+        /* Video Player Overlay */
+        .video-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 5;
+            cursor: pointer;
+        }
+
+        .video-overlay video {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            width: auto;
+            height: auto;
+        }
+
+        .video-overlay.hidden {
+            display: none;
+        }
+
+        .video-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            z-index: 6;
+        }
+        
+        .video-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 7;
+            font-size: 1.2rem;
+        }
+
+        .video-timeline {
+            width: 100%;
+            height: 4px;
+            background-color: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            cursor: pointer;
+            margin-bottom: 8px;
+            position: relative;
+        }
+
+        .video-progress {
+            height: 100%;
+            background-color: var(--accent);
+            border-radius: 2px;
+            width: 0%;
+        }
+
+        .video-controls-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .video-time {
+            color: white;
+            font-size: 0.8rem;
+        }
+
+        .video-fullscreen-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 5px;
+        }
+
+        .image-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            z-index: 6;
+            display: flex;
+            justify-content: flex-end;
+        }
+        
+        .image-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 7;
+            font-size: 1.2rem;
+        }
+
+        .image-fullscreen-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 5px;
+        }
+
+        /* Carousel - Fixed Aspect Ratio for stability */
+        .carousel-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4/3; /* Enforce ratio for carousels to prevent jumping */
+            overflow: hidden;
+            background-color: #000;
+            touch-action: pan-y pinch-zoom;
+        }
+
+        .carousel-slides {
+            display: flex;
+            height: 100%;
+            transition: transform 0.3s ease;
+            will-change: transform;
+        }
+
+        .carousel-slide {
+            flex: 0 0 100%;
+            height: 100%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .carousel-slide img,
+        .carousel-slide video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .carousel-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: rgba(0, 0, 0, 0.6);
+            border: none;
+            color: var(--accent);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 10;
+            transition: all 0.2s;
+            font-size: 1.2rem;
+            font-weight: bold;
+            opacity: 0; /* Fade in on hover */
+        }
+
+        .carousel-container:hover .carousel-nav {
+            opacity: 1;
+        }
+
+        .carousel-nav:hover {
+            background-color: var(--accent);
+            color: #000;
+        }
+
+        .carousel-nav.prev { left: 8px; }
+        .carousel-nav.next { right: 8px; }
+
+        .carousel-dots {
+            position: absolute;
+            bottom: 12px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .carousel-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.3);
+            border: none;
+            padding: 0;
+            transition: all 0.2s;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        .carousel-dot.active {
+            background-color: var(--accent);
+            transform: scale(1.2);
+        }
+
+        /* Swipe Indicator */
+        .swipe-indicator {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            z-index: 10;
+            pointer-events: none;
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 6px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+        }
+
+        .swipe-indicator-icon {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .swipe-indicator-icon span {
+            display: inline-block;
+            width: 4px;
+            height: 4px;
+            background-color: var(--accent);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        .swipe-indicator-icon span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .swipe-indicator-icon span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 20px 0;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            border-top: 1px solid var(--border);
+            margin-top: 32px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 24px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            color: var(--accent);
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        /* File Counter */
+        .file-counter {
+            background-color: var(--accent);
+            color: #000;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: 12px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Desktop Styles */
+        @media (min-width: 769px) {
+            .header-content { padding: 0 8px; }
+            .app-title { font-size: 1.8rem; }
+            .app-title .star { font-size: 2rem; }
+            .hamburger-menu { display: none; }
+            
+            .action-buttons {
+                display: flex;
+                gap: 12px;
+                align-items: center;
+            }
+            
+            .clear-button {
+                background-color: transparent;
+                color: var(--text-secondary);
+                border: 1px solid var(--border);
+                padding: 8px 20px;
+                border-radius: 8px;
+                font-size: 0.9rem;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            
+            .clear-button:hover {
+                color: #ff4444;
+                border-color: #ff4444;
+            }
+            
+            .upload-section {
+                padding: 24px;
+                margin: 24px 0;
+            }
+            
+            .stats {
+                display: flex;
+                gap: 24px;
+            }
+            
+            .stat-card { padding: 20px; }
+            .stat-value { font-size: 1.8rem; }
+        }
+
+        /* Mobile Action Buttons */
+        .mobile-action-buttons {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        @media (max-width: 768px) {
+            .action-buttons { display: none; }
+            .mobile-action-buttons { display: flex; }
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            width: 200px;
+            height: 4px;
+            background-color: var(--border);
+            border-radius: 2px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: var(--accent);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay hidden" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loadingMessage">Indexing files...</div>
+        <div class="loading-details" id="loadingDetails">0 files processed</div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+    </div>
+    
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h3>Menu</h3>
+            <button class="sidebar-close" id="sidebarClose">×</button>
+        </div>
+        <div class="sidebar-menu">
+            <div class="sidebar-item" onclick="document.getElementById('fileInput').click()">
+                <i class="fas fa-upload"></i>
+                Upload Files
+            </div>
+            <div class="sidebar-item" onclick="mediaLibrary.clearAll()">
+                <i class="fas fa-trash-alt"></i>
+                Clear All
+            </div>
+            <div class="sidebar-item" onclick="toggleFullscreen()">
+                <i class="fas fa-expand"></i>
+                Fullscreen
+            </div>
+            <div class="sidebar-item" id="autoScrollToggle">
+                <i class="fas fa-play-circle"></i>
+                Auto Scroll: Off
+            </div>
+            <div class="sidebar-item" id="shuffleBtn">
+                <i class="fas fa-random"></i>
+                Shuffle
+            </div>
+            <div class="sidebar-item" id="installPWA">
+                <i class="fas fa-download"></i>
+                Install App
+            </div>
+        </div>
+    </div>
+
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="app-title">
+                    <span>URD</span>
+                    <span class="star">*</span>
+                </div>
+                <div class="action-buttons">
+                    <span class="file-counter" id="fileCounter">0</span>
+                    <button class="clear-button" onclick="mediaLibrary.clearAll()">Clear All</button>
+                    <button class="upload-button" onclick="document.getElementById('fileInput').click()">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                        Upload
+                    </button>
+                </div>
+                <div class="mobile-action-buttons">
+                    <span class="file-counter" id="mobileFileCounter">0</span>
+                    <button class="hamburger-menu" id="hamburgerMenu">☰</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="upload-section" id="dropZone">
+            <input type="file" id="fileInput" multiple accept="image/*,video/*">
+            <input type="file" id="folderInput" webkitdirectory directory multiple accept="image/*,video/*">
+            <input type="file" id="zipInput" accept=".zip">
+            <p>Drag & drop files here or click to upload</p>
+            <p class="upload-info">Supports images, videos, and GIFs • Max 2000 files</p>
+            <div class="upload-buttons">
+                <button class="upload-button" onclick="document.getElementById('fileInput').click()">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                    Select Files
+                </button>
+                <button class="upload-button" onclick="document.getElementById('folderInput').click()">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2h-8l-2-2z"/></svg>
+                    Select Folder
+                </button>
+                <button class="upload-button" onclick="document.getElementById('zipInput').click()">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1 0.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+                    Select Zip
+                </button>
+            </div>
+        </section>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalFiles">0</div>
+                <div class="stat-label">Total Files</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="visibleFiles">0</div>
+                <div class="stat-label">Currently Displayed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="memoryUsage">0 MB</div>
+                <div class="stat-label">Memory Usage</div>
+            </div>
+        </div>
+
+        <div id="mediaContainer">
+            <div id="mediaGrid" class="media-grid"></div>
+        </div>
+        
+        <button class="bottom-scroll-top" onclick="scrollToTop()">
+            <i class="fas fa-arrow-up"></i>
+            Back to Top
+        </button>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>URD* Media Library • Optimized for 2000+ files • Dark Mode</p>
+        </div>
+    </footer>
+
+    <script>
+        class MediaLibrary {
+            constructor() {
+                this.allMedia = [];
+                this.groupedMedia = [];
+                this.mediaElements = new Map();
+                this.videoObservers = new Map();
+                this.carouselStates = new Map();
+                this.container = document.getElementById('mediaGrid');
+                this.isMobile = window.innerWidth <= 768;
+                this.isProcessing = false;
+                this.isAutoScrolling = false;
+                this.autoScrollInterval = null;
+                this.autoScrollIntervalTime = 3000; // 3 seconds
+                this.imageUrls = new Set();
+                
+                this.setupEventListeners();
+                this.updateFileCounter();
+                
+                window.addEventListener('resize', () => {
+                    this.isMobile = window.innerWidth <= 768;
+                });
+                
+                this.showEmptyState();
+                this.hideLoading();
+            }
+
+            setupEventListeners() {
+                const fileInput = document.getElementById('fileInput');
+                const folderInput = document.getElementById('folderInput');
+                const zipInput = document.getElementById('zipInput');
+                const dropZone = document.getElementById('dropZone');
+                
+                fileInput.addEventListener('change', (e) => {
+                    this.handleFiles(e.target.files);
+                    e.target.value = '';
+                });
+                
+                folderInput.addEventListener('change', (e) => {
+                    this.handleFiles(e.target.files);
+                    e.target.value = '';
+                });
+                
+                zipInput.addEventListener('change', async (e) => {
+                    if (e.target.files.length > 0) {
+                        await this.handleZipFile(e.target.files[0]);
+                        e.target.value = '';
+                    }
+                });
+                
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('dragover');
+                });
+                
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.classList.remove('dragover');
+                });
+                
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('dragover');
+                    if (e.dataTransfer.files.length) {
+                        this.handleFiles(e.dataTransfer.files);
+                    }
+                });
+                
+                dropZone.addEventListener('click', (e) => {
+                    if (e.target === dropZone || e.target.className === 'upload-section') {
+                        fileInput.click();
+                    }
+                });
+                
+                // Auto scroll toggle
+                const autoScrollToggle = document.getElementById('autoScrollToggle');
+                if (autoScrollToggle) {
+                    autoScrollToggle.addEventListener('click', () => {
+                        mediaLibrary.toggleAutoScroll();
+                    });
+                }
+                
+                // Shuffle button
+                const shuffleBtn = document.getElementById('shuffleBtn');
+                if (shuffleBtn) {
+                    shuffleBtn.addEventListener('click', () => {
+                        mediaLibrary.shuffleMedia();
+                    });
+                }
+                
+                // PWA Install button
+                const installPWA = document.getElementById('installPWA');
+                if (installPWA) {
+                    installPWA.addEventListener('click', () => {
+                        installPWAHandler();
+                    });
+                }
+            }
+
+            showLoading(message = 'Indexing files...') {
+                const overlay = document.getElementById('loadingOverlay');
+                const messageEl = document.getElementById('loadingMessage');
+                const detailsEl = document.getElementById('loadingDetails');
+                const progressEl = document.getElementById('progressFill');
+                
+                messageEl.textContent = message;
+                detailsEl.textContent = '0 files processed';
+                progressEl.style.width = '0%';
+                overlay.style.visibility = 'visible';
+                overlay.classList.remove('hidden');
+            }
+
+            updateLoading(processed, total, message = 'Indexing files...') {
+                const detailsEl = document.getElementById('loadingDetails');
+                const progressEl = document.getElementById('progressFill');
+                const messageEl = document.getElementById('loadingMessage');
+                
+                messageEl.textContent = message;
+                detailsEl.textContent = `${processed} of ${total} files processed`;
+                const percent = Math.min(100, Math.round((processed / total) * 100));
+                progressEl.style.width = `${percent}%`;
+            }
+
+            hideLoading() {
+                const overlay = document.getElementById('loadingOverlay');
+                overlay.classList.add('hidden');
+                setTimeout(() => {
+                    if (overlay.classList.contains('hidden')) {
+                        overlay.style.visibility = 'hidden';
+                    }
+                }, 300);
+            }
+
+            handleFiles(files) {
+                if (!files || files.length === 0) return;
+                
+                if (this.allMedia.length + files.length > 2000) {
+                    alert(`Cannot upload ${files.length} files. Maximum limit is 2000 files. Current: ${this.allMedia.length}`);
+                    return;
+                }
+                
+                this.addMediaFiles(files);
+            }
+            
+            async handleZipFile(zipFile) {
+                // Check if JSZip is available, if not load it
+                if (typeof JSZip === 'undefined') {
+                    await this.loadJSZip();
+                }
+                
+                if (!JSZip) {
+                    alert('JSZip library is required to extract zip files. Please include it in your project.');
+                    return;
+                }
+                
+                try {
+                    this.showLoading('Extracting zip file...');
+                    
+                    const zip = new JSZip();
+                    const zipContent = await zip.loadAsync(zipFile);
+                    
+                    // Extract all files from the zip
+                    const extractedFiles = [];
+                    
+                    for (const [filename, zipEntry] of Object.entries(zipContent.files)) {
+                        if (!zipEntry.dir) { // Only process files, not directories
+                            try {
+                                const fileBlob = await zipEntry.async('blob');
+                                const file = new File([fileBlob], filename, { type: this.getMimeType(filename) });
+                                extractedFiles.push(file);
+                            } catch (error) {
+                                console.error('Error extracting file:', filename, error);
+                            }
+                        }
+                    }
+                    
+                    if (extractedFiles.length > 0) {
+                        this.handleFiles(extractedFiles);
+                    } else {
+                        alert('No media files found in the zip archive.');
+                    }
+                } catch (error) {
+                    console.error('Error processing zip file:', error);
+                    alert('Error processing zip file: ' + error.message);
+                } finally {
+                    this.hideLoading();
+                }
+            }
+            
+            getMimeType(filename) {
+                const ext = filename.split('.').pop().toLowerCase();
+                const mimeTypes = {
+                    'jpg': 'image/jpeg',
+                    'jpeg': 'image/jpeg',
+                    'png': 'image/png',
+                    'gif': 'image/gif',
+                    'bmp': 'image/bmp',
+                    'webp': 'image/webp',
+                    'svg': 'image/svg+xml',
+                    'mp4': 'video/mp4',
+                    'avi': 'video/x-msvideo',
+                    'mov': 'video/quicktime',
+                    'wmv': 'video/x-ms-wmv',
+                    'flv': 'video/x-flv',
+                    'webm': 'video/webm',
+                    'mkv': 'video/x-matroska',
+                    'm4v': 'video/x-m4v',
+                    '3gp': 'video/3gpp'
+                };
+                return mimeTypes[ext] || 'application/octet-stream';
+            }
+            
+            async loadJSZip() {
+                return new Promise((resolve, reject) => {
+                    if (typeof JSZip !== 'undefined') {
+                        resolve();
+                        return;
+                    }
+                    
+                    const script = document.createElement('script');
+                    script.src = 'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js';
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(script);
+                });
+            }
+
+            extractGroupInfo(filename) {
+                const pattern1 = /^([a-zA-Z0-9]+)-(\d{2,})-(.+)\.[a-zA-Z0-9]+$/;
+                const pattern2 = /^(.+?)-(\d{2,})\.[a-zA-Z0-9]+$/;
+                const pattern3 = /^(.+?)_(\d{2,})\.[a-zA-Z0-9]+$/;
+                const pattern4 = /^(\d{2,})[-_\s]+(.+)\.[a-zA-Z0-9]+$/;
+                const pattern5 = /^(.+?)\s+(\d{2,})\.[a-zA-Z0-9]+$/;
+                
+                let match;
+                if (match = filename.match(pattern1)) return { baseName: match[1], groupNum: parseInt(match[2]), isGrouped: true };
+                else if (match = filename.match(pattern2)) return { baseName: match[1].replace(/[-_]/g, ' ').trim(), groupNum: parseInt(match[2]), isGrouped: true };
+                else if (match = filename.match(pattern3)) return { baseName: match[1].replace(/[-_]/g, ' ').trim(), groupNum: parseInt(match[2]), isGrouped: true };
+                else if (match = filename.match(pattern4)) return { baseName: match[2].replace(/[-_]/g, ' ').trim(), groupNum: parseInt(match[1]), isGrouped: true };
+                else if (match = filename.match(pattern5)) return { baseName: match[1].trim(), groupNum: parseInt(match[2]), isGrouped: true };
+                
+                let cleanName = filename.replace(/\.[^/.]+$/, "").replace(/[-_\s]+/g, ' ').trim();
+                cleanName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+                return { baseName: cleanName, groupNum: 0, isGrouped: false };
+            }
+
+            async processFilesInBatches(files, batchSize = 10) {
+                this.showLoading('Processing files...');
+                const totalFiles = files.length;
+                let processed = 0;
+                const results = [];
+                
+                for (let i = 0; i < files.length; i += batchSize) {
+                    const batch = files.slice(i, i + batchSize);
+                    const batchResults = batch.map((file, batchIndex) => {
+                        const info = this.extractGroupInfo(file.name);
+                        return { file, ...info, originalIndex: i + batchIndex };
+                    });
+                    
+                    results.push(...batchResults);
+                    processed += batch.length;
+                    this.updateLoading(processed, totalFiles, 'Processing files...');
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+                return results;
+            }
+
+            async groupMediaFiles(files) {
+                const processedFiles = await this.processFilesInBatches(files);
+                const groups = new Map();
+                const singles = [];
+                
+                for (const item of processedFiles) {
+                    if (item.isGrouped && item.groupNum > 0) {
+                        const key = item.baseName.toLowerCase();
+                        if (!groups.has(key)) groups.set(key, { baseName: item.baseName, items: [] });
+                        groups.get(key).items.push(item);
+                    } else {
+                        singles.push(item);
+                    }
+                }
+                
+                const result = [];
+                groups.forEach(group => {
+                    group.items.sort((a, b) => a.groupNum - b.groupNum);
+                    let isConsecutive = true;
+                    for (let i = 1; i < group.items.length; i++) {
+                        if (group.items[i].groupNum !== group.items[i-1].groupNum + 1) {
+                            isConsecutive = false;
+                            break;
+                        }
+                    }
+                    if (group.items.length > 1 && isConsecutive) {
+                        result.push({
+                            type: 'carousel',
+                            files: group.items.map(item => item.file),
+                            title: group.baseName,
+                            originalIndex: Math.min(...group.items.map(item => item.originalIndex))
+                        });
+                    } else {
+                        group.items.forEach(item => singles.push({ ...item, title: `${item.baseName} ${item.groupNum}` }));
+                    }
+                });
+                
+                singles.sort((a, b) => a.originalIndex - b.originalIndex).forEach(item => {
+                    result.push({
+                        type: 'single',
+                        files: [item.file],
+                        title: item.title || item.baseName,
+                        originalIndex: item.originalIndex
+                    });
+                });
+                
+                return result.sort((a, b) => a.originalIndex - b.originalIndex);
+            }
+
+            createMediaElement(file) {
+                // Check file size (e.g., limit to 100MB)
+                const MAX_SIZE = 100 * 1024 * 1024; // 100MB
+                if (file.size > MAX_SIZE) {
+                    console.error('File too large:', file.name, file.size);
+                    return null;
+                }
+                
+                const url = URL.createObjectURL(file);
+                
+                if (file.type.startsWith('image/')) {
+                    const img = new Image();
+                    img.loading = 'lazy';
+                    img.src = url;
+                    img.alt = file.name;
+                    
+                    // Store the URL to be used in fullscreen
+                    img.dataset.originalUrl = url;
+                    // Track the URL for cleanup
+                    this.imageUrls.add(url);
+                    
+                    // Handle loading asynchronously
+                    img.onload = () => {
+                        // Don't revoke the URL here since we might need it for fullscreen
+                    };
+                    
+                    img.onerror = () => {
+                        console.error('Failed image:', file.name);
+                        this.imageUrls.delete(url); // Remove from tracking
+                        URL.revokeObjectURL(url);
+                        // Update the UI to show error if needed
+                        if (img.parentNode) {
+                            img.outerHTML = '<span style="color:red; font-size:0.8rem">Failed to load</span>';
+                        }
+                    };
+                    
+                    // Add click event to go directly to fullscreen
+                    img.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.enterImageFullscreen(img);
+                    });
+                    
+                    return { element: img, type: 'image' };
+                } else if (file.type.startsWith('video/')) {
+                    const video = document.createElement('video');
+                    video.playsInline = true;
+                    video.muted = true; // Crucial for autoplay
+                    video.loop = true;
+                    video.preload = 'metadata';
+                    video.src = url;
+                    
+                    video.onloadedmetadata = () => {
+                        URL.revokeObjectURL(url);
+                    };
+                    
+                    video.onerror = () => {
+                        console.error('Failed video:', file.name);
+                        URL.revokeObjectURL(url);
+                        // Update the UI to show error if needed
+                        if (video.parentNode) {
+                            video.outerHTML = '<span style="color:red; font-size:0.8rem">Failed to load</span>';
+                        }
+                    };
+                    
+                    // Add click event to play video in place
+                    video.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.playVideoInPlace(video);
+                    });
+                    
+                    // Attach observer immediately for both mobile and desktop
+                    const observer = new IntersectionObserver((entries) => {
+                        entries.forEach(entry => {
+                            if (entry.isIntersecting) {
+                                // Only auto-play if not in an overlay
+                                if (!video.parentElement || !video.parentElement.classList.contains('video-overlay')) {
+                                    video.play().catch(e => console.log('Autoplay prevented:', e));
+                                }
+                            } else {
+                                // Only pause if not in an overlay
+                                if (!video.parentElement || !video.parentElement.classList.contains('video-overlay')) {
+                                    video.pause();
+                                    video.currentTime = 0;
+                                }
+                            }
+                        });
+                    }, { threshold: 0.25 }); // Lower threshold for better response
+                    this.videoObservers.set(video, observer);
+                    observer.observe(video);
+                    
+                    return { element: video, type: 'video' };
+                }
+                
+                URL.revokeObjectURL(url);
+                return null;
+            }
+
+            createCarousel(group, cardId) {
+                const container = document.createElement('div');
+                container.className = 'carousel-container';
+                container.id = `carousel-${cardId}`;
+                
+                const slidesContainer = document.createElement('div');
+                slidesContainer.className = 'carousel-slides';
+                
+                this.carouselStates.set(cardId, {
+                    currentSlide: 0,
+                    totalSlides: group.files.length,
+                    slides: []
+                });
+                
+                const state = this.carouselStates.get(cardId);
+                
+                for (let i = 0; i < group.files.length; i++) {
+                    const slide = document.createElement('div');
+                    slide.className = 'carousel-slide';
+                    slide.dataset.index = i;
+                    
+                    const media = this.createMediaElement(group.files[i]);
+                    if (media) {
+                        slide.appendChild(media.element);
+                    } else {
+                        const errorDiv = document.createElement('div');
+                        errorDiv.style.display = 'flex';
+                        errorDiv.style.alignItems = 'center';
+                        errorDiv.style.justifyContent = 'center';
+                        errorDiv.style.height = '100%';
+                        errorDiv.style.color = 'var(--text-secondary)';
+                        errorDiv.innerHTML = 'Error loading media';
+                        slide.appendChild(errorDiv);
+                    }
+                    
+                    slidesContainer.appendChild(slide);
+                    state.slides.push(slide);
+                }
+                
+                container.appendChild(slidesContainer);
+                
+                // Add swipe indicator
+                const swipeIndicator = document.createElement('div');
+                swipeIndicator.className = 'swipe-indicator';
+                swipeIndicator.innerHTML = `
+                    <span>Swipe</span>
+                    <div class="swipe-indicator-icon">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                `;
+                container.appendChild(swipeIndicator);
+                
+                // Add navigation only if multiple slides
+                if (group.files.length > 1) {
+                    if (!this.isMobile) {
+                        const prevBtn = document.createElement('button');
+                        prevBtn.className = 'carousel-nav prev';
+                        prevBtn.innerHTML = '‹';
+                        prevBtn.onclick = (e) => { e.stopPropagation(); this.navigateCarousel(cardId, -1); };
+                        
+                        const nextBtn = document.createElement('button');
+                        nextBtn.className = 'carousel-nav next';
+                        nextBtn.innerHTML = '›';
+                        nextBtn.onclick = (e) => { e.stopPropagation(); this.navigateCarousel(cardId, 1); };
+                        
+                        container.appendChild(prevBtn);
+                        container.appendChild(nextBtn);
+                        
+                        const dotsContainer = document.createElement('div');
+                        dotsContainer.className = 'carousel-dots';
+                        for (let i = 0; i < group.files.length; i++) {
+                            const dot = document.createElement('button');
+                            dot.className = `carousel-dot ${i === 0 ? 'active' : ''}`;
+                            dot.onclick = (e) => { e.stopPropagation(); this.goToSlide(cardId, i); };
+                            dotsContainer.appendChild(dot);
+                        }
+                        container.appendChild(dotsContainer);
+                    }
+                    if (this.isMobile) {
+                        this.setupCarouselTouchEvents(container, cardId);
+                    }
+                }
+                
+                // Load slides using synchronous media creation
+                group.files.forEach((file, index) => {
+                    const media = this.createMediaElement(file);
+                    const slide = state.slides[index];
+                    if (media && slide) {
+                        slide.innerHTML = '';
+                        slide.appendChild(media.element);
+                    } else if (slide) {
+                        slide.innerHTML = '<span style="color:red; font-size:0.8rem">Error</span>';
+                    }
+                });
+                
+                return container;
+            }
+
+            setupCarouselTouchEvents(container, carouselId) {
+                const state = this.carouselStates.get(carouselId);
+                const slidesContainer = container.querySelector('.carousel-slides');
+                let startX = 0;
+                let currentX = 0;
+                let isDragging = false;
+                
+                const onTouchStart = (e) => {
+                    isDragging = true;
+                    startX = e.touches ? e.touches[0].clientX : e.clientX;
+                    currentX = startX;
+                    slidesContainer.style.transition = 'none';
+                };
+                
+                const onTouchMove = (e) => {
+                    if (!isDragging) return;
+                    currentX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const xDiff = Math.abs(currentX - startX);
+                    if (xDiff < 10) return; // Allow vertical scroll
+                    e.preventDefault();
+                    
+                    const diff = currentX - startX;
+                    const slideWidth = container.clientWidth;
+                    const basePosition = -state.currentSlide * slideWidth;
+                    slidesContainer.style.transform = `translateX(${basePosition + diff}px)`;
+                };
+                
+                const onTouchEnd = () => {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    const slideWidth = container.clientWidth;
+                    const diff = currentX - startX;
+                    slidesContainer.style.transition = 'transform 0.3s ease';
+                    
+                    if (Math.abs(diff) > slideWidth * 0.25) {
+                        this.navigateCarousel(carouselId, diff > 0 ? -1 : 1);
+                    } else {
+                        this.goToSlide(carouselId, state.currentSlide);
+                    }
+                };
+                
+                container.addEventListener('touchstart', onTouchStart, { passive: false });
+                container.addEventListener('touchmove', onTouchMove, { passive: false });
+                container.addEventListener('touchend', onTouchEnd);
+            }
+
+            navigateCarousel(carouselId, direction) {
+                const state = this.carouselStates.get(carouselId);
+                let newSlide = state.currentSlide + direction;
+                if (newSlide < 0) newSlide = state.totalSlides - 1;
+                if (newSlide >= state.totalSlides) newSlide = 0;
+                this.goToSlide(carouselId, newSlide);
+            }
+
+            goToSlide(carouselId, slideIndex) {
+                const state = this.carouselStates.get(carouselId);
+                state.currentSlide = slideIndex;
+                const container = document.getElementById(`carousel-${carouselId}`);
+                const slidesContainer = container.querySelector('.carousel-slides');
+                const slideWidth = container.clientWidth;
+                slidesContainer.style.transform = `translateX(${-slideIndex * slideWidth}px)`;
+                
+                const dots = container.querySelectorAll('.carousel-dot');
+                dots.forEach((dot, index) => dot.classList.toggle('active', index === slideIndex));
+            }
+
+            createMediaCard(mediaGroup, index) {
+                const card = document.createElement('div');
+                card.className = 'media-card';
+                card.dataset.index = index;
+                card.style.animationDelay = `${index * 0.05}s`;
+                
+                const header = document.createElement('div');
+                header.className = 'card-header';
+                const title = document.createElement('div');
+                title.className = 'card-title';
+                title.textContent = mediaGroup.title;
+                header.appendChild(title);
+                
+                const preview = document.createElement('div');
+                preview.className = 'media-preview';
+                
+                if (mediaGroup.type === 'carousel') {
+                    const carousel = this.createCarousel(mediaGroup, index);
+                    preview.appendChild(carousel);
+                } else {
+                    // Single file
+                    const media = this.createMediaElement(mediaGroup.files[0]);
+                    if (media) {
+                        preview.appendChild(media.element);
+                    } else {
+                        const errorDiv = document.createElement('div');
+                        errorDiv.style.display = 'flex';
+                        errorDiv.style.alignItems = 'center';
+                        errorDiv.style.justifyContent = 'center';
+                        errorDiv.style.height = '150px';
+                        errorDiv.style.color = 'var(--text-secondary)';
+                        errorDiv.innerHTML = 'Error loading media';
+                        preview.appendChild(errorDiv);
+                    }
+                }
+                
+                card.appendChild(header);
+                card.appendChild(preview);
+                return card;
+            }
+
+            async addMediaFiles(files) {
+                if (this.isProcessing) return;
+                this.isProcessing = true;
+                const fileArray = Array.from(files);
+                
+                try {
+                    this.showLoading('Adding files...');
+                    fileArray.forEach(file => this.allMedia.push(file));
+                    
+                    this.container.innerHTML = '<div class="empty-state"><h3>Processing files...</h3><p>Please wait while we organize your media</p></div>';
+                    
+                    this.updateLoading(0, fileArray.length, 'Organizing files...');
+                    this.groupedMedia = await this.groupMediaFiles(this.allMedia);
+                    
+                    this.container.innerHTML = '';
+                    const batchSize = 10;
+                    
+                    for (let i = 0; i < this.groupedMedia.length; i += batchSize) {
+                        const batch = this.groupedMedia.slice(i, i + batchSize);
+                        const fragment = document.createDocumentFragment();
+                        
+                        batch.forEach((group, batchIndex) => {
+                            fragment.appendChild(this.createMediaCard(group, i + batchIndex));
+                        });
+                        
+                        this.container.appendChild(fragment);
+                        this.updateLoading(Math.min(i + batchSize, this.groupedMedia.length), this.groupedMedia.length, 'Creating cards...');
+                        await new Promise(resolve => setTimeout(resolve, 20)); // Breathe
+                    }
+                    
+                    this.updateStats();
+                } catch (error) {
+                    console.error('Error processing files:', error);
+                    this.showEmptyState();
+                } finally {
+                    this.isProcessing = false;
+                    this.hideLoading();
+                }
+            }
+
+            updateStats() {
+                document.getElementById('totalFiles').textContent = this.allMedia.length;
+                document.getElementById('visibleFiles').textContent = this.groupedMedia.length;
+                let totalSize = 0;
+                this.allMedia.forEach(file => { totalSize += file.size; });
+                const memoryMB = (totalSize / (1024 * 1024)).toFixed(1);
+                document.getElementById('memoryUsage').textContent = `${memoryMB} MB`;
+                this.updateFileCounter();
+            }
+
+            updateFileCounter() {
+                const count = this.allMedia.length;
+                document.getElementById('fileCounter').textContent = count;
+                document.getElementById('mobileFileCounter').textContent = count;
+                const display = count > 0 ? 'inline-block' : 'none';
+                document.getElementById('fileCounter').style.display = display;
+                document.getElementById('mobileFileCounter').style.display = display;
+            }
+
+            cleanupObservers() {
+                this.videoObservers.forEach((observer, video) => {
+                    observer.disconnect();
+                    video.pause();
+                    video.src = '';
+                    video.load();
+                });
+                this.videoObservers.clear();
+                
+                // Revoke all tracked image blob URLs
+                this.imageUrls.forEach(url => {
+                    try {
+                        URL.revokeObjectURL(url);
+                    } catch (e) {
+                        // URL might already be revoked, ignore error
+                    }
+                });
+                this.imageUrls.clear();
+                
+                this.mediaElements.clear();
+            }
+            
+            clearAll() {
+                if (this.allMedia.length === 0) return;
+                if (!confirm(`Clear all ${this.allMedia.length} files?`)) return;
+                
+                this.showLoading('Clearing files...');
+                setTimeout(() => {
+                    this.cleanupObservers();
+                    this.mediaElements.clear();
+                    this.carouselStates.clear();
+                    this.allMedia = [];
+                    this.groupedMedia = [];
+                    this.container.innerHTML = '';
+                    this.updateStats();
+                    this.showEmptyState();
+                    this.hideLoading();
+                }, 100);
+            }
+
+            showEmptyState() {
+                this.container.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                        <h3>No media uploaded yet</h3>
+                        <p>Upload images, videos, or GIFs to get started</p>
+                    </div>`;
+            }
+            
+            playVideoInPlace(video) {
+                // Check if the video is already in a video overlay
+                if (video.parentElement && video.parentElement.classList.contains('video-overlay')) {
+                    // If it's already playing in overlay, toggle play/pause
+                    if (video.paused) {
+                        video.play();
+                    } else {
+                        video.pause();
+                    }
+                    return;
+                }
+                
+                // Store original video dimensions and aspect ratio
+                const originalWidth = video.offsetWidth;
+                const originalHeight = video.offsetHeight;
+                
+                // Create overlay container
+                const previewContainer = video.parentElement;
+                const originalParent = video.parentElement;
+                
+                // Create video overlay
+                const overlay = document.createElement('div');
+                overlay.className = 'video-overlay';
+                
+                // Create video controls
+                const controls = document.createElement('div');
+                controls.className = 'video-controls';
+                
+                const timeline = document.createElement('div');
+                timeline.className = 'video-timeline';
+                
+                const progress = document.createElement('div');
+                progress.className = 'video-progress';
+                timeline.appendChild(progress);
+                
+                const controlsBottom = document.createElement('div');
+                controlsBottom.className = 'video-controls-bottom';
+                
+                const timeDisplay = document.createElement('div');
+                timeDisplay.className = 'video-time';
+                timeDisplay.textContent = `0:00 / ${this.formatTime(video.duration)}`;
+                
+                const fullscreenBtn = document.createElement('button');
+                fullscreenBtn.className = 'video-fullscreen-btn';
+                fullscreenBtn.innerHTML = '⛶';
+                fullscreenBtn.title = 'Fullscreen';
+                
+                controlsBottom.appendChild(timeDisplay);
+                controlsBottom.appendChild(fullscreenBtn);
+                
+                controls.appendChild(timeline);
+                controls.appendChild(controlsBottom);
+                
+                // Create close button
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'video-close-btn';
+                closeBtn.innerHTML = '✕';
+                closeBtn.title = 'Close';
+                
+                // Add video to overlay
+                overlay.appendChild(closeBtn);
+                overlay.appendChild(video);
+                overlay.appendChild(controls);
+                
+                // Replace original video with overlay
+                originalParent.appendChild(overlay);
+                
+                // Handle close
+                closeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.exitVideoOverlay(video, originalParent);
+                });
+                
+                // Update timeline as video plays
+                video.addEventListener('timeupdate', () => {
+                    const percent = (video.currentTime / video.duration) * 100;
+                    progress.style.width = `${percent}%`;
+                    timeDisplay.textContent = `${this.formatTime(video.currentTime)} / ${this.formatTime(video.duration)}`;
+                });
+                
+                // Handle timeline click to seek
+                timeline.addEventListener('click', (e) => {
+                    const rect = timeline.getBoundingClientRect();
+                    const pos = (e.clientX - rect.left) / rect.width;
+                    video.currentTime = pos * video.duration;
+                });
+                
+                // Handle fullscreen
+                fullscreenBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.enterVideoFullscreen(video);
+                });
+                
+                // Play the video
+                video.play().catch(e => console.log('Play prevented:', e));
+            }
+            
+            formatTime(seconds) {
+                if (isNaN(seconds)) return '0:00';
+                
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+            }
+            
+            enterVideoFullscreen(video) {
+                // Check if already in fullscreen
+                if (document.fullscreenElement || document.mozFullScreenElement || 
+                    document.webkitFullscreenElement || document.msFullscreenElement) {
+                    // If already in fullscreen, just focus the video
+                    video.focus();
+                    return;
+                }
+                
+                // Try different fullscreen methods
+                if (video.requestFullscreen) {
+                    video.requestFullscreen();
+                } else if (video.webkitRequestFullscreen) {
+                    video.webkitRequestFullscreen();
+                } else if (video.mozRequestFullScreen) {
+                    video.mozRequestFullScreen();
+                } else if (video.msRequestFullscreen) {
+                    video.msRequestFullscreen();
+                }
+            }
+            
+
+            
+            enterImageFullscreen(img) {
+                // Check if already in fullscreen
+                if (document.fullscreenElement || document.mozFullScreenElement || 
+                    document.webkitFullscreenElement || document.msFullscreenElement) {
+                    // If already in fullscreen, just return
+                    return;
+                }
+                
+                // Create a temporary element to fullscreen
+                const tempContainer = document.createElement('div');
+                tempContainer.style.position = 'fixed';
+                tempContainer.style.top = '0';
+                tempContainer.style.left = '0';
+                tempContainer.style.width = '100%';
+                tempContainer.style.height = '100%';
+                tempContainer.style.backgroundColor = 'black';
+                tempContainer.style.display = 'flex';
+                tempContainer.style.justifyContent = 'center';
+                tempContainer.style.alignItems = 'center';
+                tempContainer.style.zIndex = '9999';
+                
+                // Create a new image element using the original URL to avoid blob issues
+                const fullscreenImg = new Image();
+                fullscreenImg.src = img.src; // Use the same src which should be the original URL
+                fullscreenImg.style.maxWidth = '100%';
+                fullscreenImg.style.maxHeight = '100%';
+                fullscreenImg.style.objectFit = 'contain';
+                
+                tempContainer.appendChild(fullscreenImg);
+                document.body.appendChild(tempContainer);
+                
+                // Add click to exit fullscreen
+                tempContainer.addEventListener('click', () => {
+                    if (document.fullscreenElement) {
+                        if (document.exitFullscreen) {
+                            document.exitFullscreen();
+                        } else if (document.webkitExitFullscreen) {
+                            document.webkitExitFullscreen();
+                        } else if (document.mozCancelFullScreen) {
+                            document.mozCancelFullScreen();
+                        } else if (document.msExitFullscreen) {
+                            document.msExitFullscreen();
+                        }
+                    }
+                    document.body.removeChild(tempContainer);
+                });
+                
+                // Try different fullscreen methods
+                if (tempContainer.requestFullscreen) {
+                    tempContainer.requestFullscreen();
+                } else if (tempContainer.webkitRequestFullscreen) {
+                    tempContainer.webkitRequestFullscreen();
+                } else if (tempContainer.mozRequestFullScreen) {
+                    tempContainer.mozRequestFullScreen();
+                } else if (tempContainer.msRequestFullscreen) {
+                    tempContainer.msRequestFullscreen();
+                }
+            }
+            
+            toggleAutoScroll() {
+                this.isAutoScrolling = !this.isAutoScrolling;
+                
+                const toggleBtn = document.getElementById('autoScrollToggle');
+                if (this.isAutoScrolling) {
+                    toggleBtn.innerHTML = `Auto Scroll: On`;
+                    this.startAutoScroll();
+                } else {
+                    toggleBtn.innerHTML = `Auto Scroll: Off`;
+                    this.stopAutoScroll();
+                }
+            }
+            
+            startAutoScroll() {
+                if (this.autoScrollInterval) {
+                    clearInterval(this.autoScrollInterval);
+                }
+                
+                this.autoScrollInterval = setInterval(() => {
+                    const scrollPosition = window.scrollY;
+                    const windowHeight = window.innerHeight;
+                    const documentHeight = document.documentElement.scrollHeight;
+                    
+                    // If we've reached the bottom, scroll back to top
+                    if (scrollPosition + windowHeight >= documentHeight - 100) {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    } else {
+                        // Scroll down by 10px for smoother scrolling
+                        window.scrollBy({ top: 10, behavior: 'smooth' });
+                    }
+                }, 100); // Update more frequently for smoother scrolling
+            }
+            
+            stopAutoScroll() {
+                if (this.autoScrollInterval) {
+                    clearInterval(this.autoScrollInterval);
+                    this.autoScrollInterval = null;
+                }
+            }
+            
+            shuffleMedia() {
+                if (this.groupedMedia.length === 0) return;
+                
+                // Create separate arrays for carousels and single items
+                const carousels = this.groupedMedia.filter(item => item.type === 'carousel');
+                const singles = this.groupedMedia.filter(item => item.type === 'single');
+                
+                // Shuffle both arrays
+                this.shuffleArray(carousels);
+                this.shuffleArray(singles);
+                
+                // Create a new array with shuffled items
+                const allItems = [];
+                
+                // Create a combined array of 'carousel' and 'single' placeholders to shuffle the positions
+                const types = [];
+                this.groupedMedia.forEach(item => {
+                    types.push(item.type);
+                });
+                
+                // Shuffle the types array to randomize positions
+                this.shuffleArray(types);
+                
+                // Now fill in the shuffled positions with shuffled items
+                let carouselIndex = 0;
+                let singleIndex = 0;
+                
+                for (const type of types) {
+                    if (type === 'carousel' && carouselIndex < carousels.length) {
+                        allItems.push(carousels[carouselIndex]);
+                        carouselIndex++;
+                    } else if (type === 'single' && singleIndex < singles.length) {
+                        allItems.push(singles[singleIndex]);
+                        singleIndex++;
+                    }
+                }
+                
+                // Update the grouped media with shuffled items
+                this.groupedMedia = allItems;
+                
+                // Re-render the media grid
+                this.renderMediaGrid();
+            }
+            
+            shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+            
+            renderMediaGrid() {
+                // Clear the container
+                this.container.innerHTML = '';
+                
+                // Create and append media cards
+                this.groupedMedia.forEach((group, index) => {
+                    this.container.appendChild(this.createMediaCard(group, index));
+                });
+                
+                this.updateStats();
+            }
+            
+            exitVideoOverlay(video, originalParent) {
+                // Remove the overlay and put the video back in its original location
+                const overlay = video.parentElement;
+                if (overlay && overlay.classList.contains('video-overlay')) {
+                    // Remove the overlay from the DOM
+                    overlay.removeChild(video);
+                    // Put the video back in its original parent
+                    originalParent.appendChild(video);
+                }
+            }
+            
+
+        }
+
+        const mediaLibrary = new MediaLibrary();
+        const hamburgerMenu = document.getElementById('hamburgerMenu');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        const sidebarClose = document.getElementById('sidebarClose');
+
+        function openSidebar() {
+            sidebar.classList.add('active');
+            sidebarOverlay.style.display = 'block';
+            setTimeout(() => { sidebarOverlay.style.opacity = '1'; }, 10);
+        }
+
+        function closeSidebar() {
+            sidebar.classList.remove('active');
+            sidebarOverlay.style.opacity = '0';
+            setTimeout(() => { sidebarOverlay.style.display = 'none'; }, 300);
+        }
+
+        hamburgerMenu.addEventListener('click', openSidebar);
+        sidebarClose.addEventListener('click', closeSidebar);
+        sidebarOverlay.addEventListener('click', closeSidebar);
+
+        function toggleFullscreen() {
+            closeSidebar();
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                document.body.classList.add('fullscreen');
+            } else {
+                document.body.classList.remove('fullscreen');
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            mediaLibrary.cleanupObservers();
+            mediaLibrary.mediaElements.clear();
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                mediaLibrary.videoObservers.forEach((observer, video) => {
+                    video.pause();
+                });
+            }
+        });
+        
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+
+        // PWA Installation functionality
+        let deferredPrompt;
+        
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent the mini-infobar from appearing on mobile
+            e.preventDefault();
+            // Stash the event so it can be triggered later
+            deferredPrompt = e;
+        });
+        
+        function installPWAHandler() {
+            if (deferredPrompt) {
+                // Show the install prompt
+                deferredPrompt.prompt();
+                
+                // Wait for the user to respond to the prompt
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User accepted the install prompt');
+                    } else {
+                        console.log('User dismissed the install prompt');
+                    }
+                    deferredPrompt = null;
+                });
+            } else {
+                // PWA is already installed or not supported
+                if (window.matchMedia('(display-mode: standalone)').matches) {
+                    alert('App is already installed!');
+                } else {
+                    alert('PWA installation is not supported in this browser or already installed.');
+                }
+            }
+        }
+
+        // Check if app is installed
+        window.addEventListener('appinstalled', () => {
+            console.log('PWA was installed');
+        });
+        
+        // Register service worker for PWA functionality
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((registration) => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('ServiceWorker registration failed: ', error);
+                    });
+            });
+        }
+
+    </script>
+</body>
+</html>
